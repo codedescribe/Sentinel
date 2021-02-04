@@ -21,6 +21,8 @@ import java.util.List;
 import com.alibaba.csp.sentinel.dashboard.auth.AuthAction;
 import com.alibaba.csp.sentinel.dashboard.auth.AuthService;
 import com.alibaba.csp.sentinel.dashboard.auth.AuthService.PrivilegeType;
+import com.alibaba.csp.sentinel.dashboard.nacos.NacosConfig;
+import com.alibaba.csp.sentinel.dashboard.nacos.publisher.FlowRuleNacosPublisher;
 import com.alibaba.csp.sentinel.util.StringUtil;
 
 import com.alibaba.csp.sentinel.dashboard.datasource.entity.rule.FlowRuleEntity;
@@ -64,6 +66,11 @@ public class FlowControllerV2 {
     @Autowired
     @Qualifier("flowRuleNacosPublisher")
     private DynamicRulePublisher<List<FlowRuleEntity>> rulePublisher;
+
+    @Autowired
+    private NacosConfig nacosConfig;
+    @Autowired
+    private FlowRuleNacosPublisher flowRuleNacosPublisher;
 
     @GetMapping("/rules")
     @AuthAction(PrivilegeType.READ_RULE)
@@ -221,6 +228,13 @@ public class FlowControllerV2 {
 
     private void publishRules(/*@NonNull*/ String app) throws Exception {
         List<FlowRuleEntity> rules = repository.findAllByApp(app);
+        if (nacosConfig.isEnable()) {
+            try {
+                flowRuleNacosPublisher.publish(app, rules);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
         rulePublisher.publish(app, rules);
     }
 }

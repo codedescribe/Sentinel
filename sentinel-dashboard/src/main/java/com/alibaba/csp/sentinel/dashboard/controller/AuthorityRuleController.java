@@ -18,10 +18,15 @@ package com.alibaba.csp.sentinel.dashboard.controller;
 import java.util.Date;
 import java.util.List;
 
-import com.alibaba.csp.sentinel.dashboard.auth.AuthAction;
+import javax.servlet.http.HttpServletRequest;
+
 import com.alibaba.csp.sentinel.dashboard.client.SentinelApiClient;
 import com.alibaba.csp.sentinel.dashboard.discovery.MachineInfo;
+import com.alibaba.csp.sentinel.dashboard.auth.AuthService;
+import com.alibaba.csp.sentinel.dashboard.auth.AuthService.AuthUser;
 import com.alibaba.csp.sentinel.dashboard.auth.AuthService.PrivilegeType;
+import com.alibaba.csp.sentinel.dashboard.nacos.NacosConfig;
+import com.alibaba.csp.sentinel.dashboard.nacos.publisher.AuthorityRuleNacosPublisher;
 import com.alibaba.csp.sentinel.slots.block.RuleConstant;
 import com.alibaba.csp.sentinel.util.StringUtil;
 
@@ -57,11 +62,22 @@ public class AuthorityRuleController {
     @Autowired
     private RuleRepository<AuthorityRuleEntity, Long> repository;
 
+    @Autowired
+    private AuthService<HttpServletRequest> authService;
+
+    @Autowired
+    private NacosConfig nacosConfig;
+
+    @Autowired
+    private AuthorityRuleNacosPublisher authorityRuleNacosPublisher;
+
     @GetMapping("/rules")
-    @AuthAction(PrivilegeType.READ_RULE)
-    public Result<List<AuthorityRuleEntity>> apiQueryAllRulesForMachine(@RequestParam String app,
+    public Result<List<AuthorityRuleEntity>> apiQueryAllRulesForMachine(HttpServletRequest request,
+                                                                        @RequestParam String app,
                                                                         @RequestParam String ip,
                                                                         @RequestParam Integer port) {
+        AuthUser authUser = authService.getAuthUser(request);
+        authUser.authTarget(app, PrivilegeType.READ_RULE);
         if (StringUtil.isEmpty(app)) {
             return Result.ofFail(-1, "app cannot be null or empty");
         }
@@ -104,15 +120,17 @@ public class AuthorityRuleController {
             return Result.ofFail(-1, "limitApp should be valid");
         }
         if (entity.getStrategy() != RuleConstant.AUTHORITY_WHITE
-            && entity.getStrategy() != RuleConstant.AUTHORITY_BLACK) {
+                && entity.getStrategy() != RuleConstant.AUTHORITY_BLACK) {
             return Result.ofFail(-1, "Unknown strategy (must be blacklist or whitelist)");
         }
         return null;
     }
 
     @PostMapping("/rule")
-    @AuthAction(PrivilegeType.WRITE_RULE)
-    public Result<AuthorityRuleEntity> apiAddAuthorityRule(@RequestBody AuthorityRuleEntity entity) {
+    public Result<AuthorityRuleEntity> apiAddAuthorityRule(HttpServletRequest request,
+                                                           @RequestBody AuthorityRuleEntity entity) {
+        AuthUser authUser = authService.getAuthUser(request);
+        authUser.authTarget(entity.getApp(), PrivilegeType.WRITE_RULE);
         Result<AuthorityRuleEntity> checkResult = checkEntityInternal(entity);
         if (checkResult != null) {
             return checkResult;
@@ -134,9 +152,11 @@ public class AuthorityRuleController {
     }
 
     @PutMapping("/rule/{id}")
-    @AuthAction(PrivilegeType.WRITE_RULE)
-    public Result<AuthorityRuleEntity> apiUpdateParamFlowRule(@PathVariable("id") Long id,
+    public Result<AuthorityRuleEntity> apiUpdateParamFlowRule(HttpServletRequest request,
+                                                              @PathVariable("id") Long id,
                                                               @RequestBody AuthorityRuleEntity entity) {
+        AuthUser authUser = authService.getAuthUser(request);
+        authUser.authTarget(entity.getApp(), PrivilegeType.WRITE_RULE);
         if (id == null || id <= 0) {
             return Result.ofFail(-1, "Invalid id");
         }
@@ -164,8 +184,8 @@ public class AuthorityRuleController {
     }
 
     @DeleteMapping("/rule/{id}")
-    @AuthAction(PrivilegeType.DELETE_RULE)
-    public Result<Long> apiDeleteRule(@PathVariable("id") Long id) {
+    public Result<Long> apiDeleteRule(HttpServletRequest request, @PathVariable("id") Long id) {
+        AuthUser authUser = authService.getAuthUser(request);
         if (id == null) {
             return Result.ofFail(-1, "id cannot be null");
         }
@@ -173,6 +193,7 @@ public class AuthorityRuleController {
         if (oldEntity == null) {
             return Result.ofSuccess(null);
         }
+        authUser.authTarget(oldEntity.getApp(), PrivilegeType.DELETE_RULE);
         try {
             repository.delete(id);
         } catch (Exception e) {
@@ -186,6 +207,14 @@ public class AuthorityRuleController {
 
     private boolean publishRules(String app, String ip, Integer port) {
         List<AuthorityRuleEntity> rules = repository.findAllByMachine(MachineInfo.of(app, ip, port));
+        if (nacosConfig.isEnable()) {
+            try {
+                authorityRuleNacosPublisher.publish(app, rules);
+            } catch (Exception e) {
+                logger.error("publishRules failed. ", e);
+                return false;
+            }
+        }
         return sentinelApiClient.setAuthorityRuleOfMachine(app, ip, port, rules);
     }
 }

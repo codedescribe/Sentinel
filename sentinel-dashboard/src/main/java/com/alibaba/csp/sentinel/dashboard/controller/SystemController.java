@@ -19,7 +19,10 @@ import java.util.Date;
 import java.util.List;
 
 import com.alibaba.csp.sentinel.dashboard.auth.AuthAction;
+import com.alibaba.csp.sentinel.dashboard.auth.AuthService;
 import com.alibaba.csp.sentinel.dashboard.auth.AuthService.PrivilegeType;
+import com.alibaba.csp.sentinel.dashboard.nacos.NacosConfig;
+import com.alibaba.csp.sentinel.dashboard.nacos.publisher.SystemRuleNacosPublisher;
 import com.alibaba.csp.sentinel.dashboard.repository.rule.RuleRepository;
 import com.alibaba.csp.sentinel.util.StringUtil;
 
@@ -35,6 +38,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import javax.servlet.http.HttpServletRequest;
+
 /**
  * @author leyou(lihao)
  */
@@ -48,6 +53,15 @@ public class SystemController {
     private RuleRepository<SystemRuleEntity, Long> repository;
     @Autowired
     private SentinelApiClient sentinelApiClient;
+
+    @Autowired
+    private AuthService<HttpServletRequest> authService;
+
+    @Autowired
+    private NacosConfig nacosConfig;
+
+    @Autowired
+    private SystemRuleNacosPublisher systemRuleNacosPublisher;
 
     private <R> Result<R> checkBasicParams(String app, String ip, Integer port) {
         if (StringUtil.isEmpty(app)) {
@@ -243,8 +257,23 @@ public class SystemController {
         return Result.ofSuccess(id);
     }
 
+//    private boolean publishRules(String app, String ip, Integer port) {
+//        List<SystemRuleEntity> rules = repository.findAllByMachine(MachineInfo.of(app, ip, port));
+//        return sentinelApiClient.setSystemRuleOfMachine(app, ip, port, rules);
+//    }
+
     private boolean publishRules(String app, String ip, Integer port) {
+        //获取机器的所有配置
         List<SystemRuleEntity> rules = repository.findAllByMachine(MachineInfo.of(app, ip, port));
+        if (nacosConfig.isEnable()) {
+            try {
+                //推送规则
+                systemRuleNacosPublisher.publish(app, rules);
+            } catch (Exception e) {
+                logger.error("publishRules failed. ", e);
+                return false;
+            }
+        }
         return sentinelApiClient.setSystemRuleOfMachine(app, ip, port, rules);
     }
 }

@@ -13,37 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.alibaba.csp.sentinel.dashboard.controller;
+package com.alibaba.csp.sentinel.dashboard.controller.v2;
 
-import java.util.Date;
-import java.util.List;
-
-import javax.servlet.http.HttpServletRequest;
-
-import com.alibaba.csp.sentinel.dashboard.auth.AuthService;
-import com.alibaba.csp.sentinel.dashboard.auth.AuthService.AuthUser;
+import com.alibaba.csp.sentinel.dashboard.auth.AuthAction;
 import com.alibaba.csp.sentinel.dashboard.auth.AuthService.PrivilegeType;
-import com.alibaba.csp.sentinel.dashboard.nacos.NacosConfig;
-import com.alibaba.csp.sentinel.dashboard.nacos.publisher.FlowRuleNacosPublisher;
-import com.alibaba.csp.sentinel.util.StringUtil;
-
 import com.alibaba.csp.sentinel.dashboard.client.SentinelApiClient;
 import com.alibaba.csp.sentinel.dashboard.datasource.entity.rule.FlowRuleEntity;
 import com.alibaba.csp.sentinel.dashboard.discovery.MachineInfo;
 import com.alibaba.csp.sentinel.dashboard.domain.Result;
 import com.alibaba.csp.sentinel.dashboard.repository.rule.InMemoryRuleRepositoryAdapter;
-
+import com.alibaba.csp.sentinel.util.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.Date;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Flow rule controller.
@@ -52,32 +41,22 @@ import org.springframework.web.bind.annotation.RestController;
  * @author Eric Zhao
  */
 @RestController
-@RequestMapping(value = "/v1/flow")
-public class FlowControllerV1 {
+@RequestMapping(value = "/v1/flowbackup")
+public class FlowControllerV1BackUp {
 
-    private final Logger logger = LoggerFactory.getLogger(FlowControllerV1.class);
+    private final Logger logger = LoggerFactory.getLogger(FlowControllerV1BackUp.class);
 
     @Autowired
     private InMemoryRuleRepositoryAdapter<FlowRuleEntity> repository;
-    @Autowired
-    private AuthService<HttpServletRequest> authService;
 
     @Autowired
     private SentinelApiClient sentinelApiClient;
 
-    @Autowired
-    private NacosConfig nacosConfig;
-
-    @Autowired
-    private FlowRuleNacosPublisher flowRuleNacosPublisher;
-
     @GetMapping("/rules")
-    public Result<List<FlowRuleEntity>> apiQueryMachineRules(HttpServletRequest request,
-                                                             @RequestParam String app,
+    @AuthAction(PrivilegeType.READ_RULE)
+    public Result<List<FlowRuleEntity>> apiQueryMachineRules(@RequestParam String app,
                                                              @RequestParam String ip,
                                                              @RequestParam Integer port) {
-        AuthUser authUser = authService.getAuthUser(request);
-        authUser.authTarget(app, PrivilegeType.READ_RULE);
 
         if (StringUtil.isEmpty(app)) {
             return Result.ofFail(-1, "app can't be null or empty");
@@ -146,10 +125,8 @@ public class FlowControllerV1 {
     }
 
     @PostMapping("/rule")
-    public Result<FlowRuleEntity> apiAddFlowRule(HttpServletRequest request, @RequestBody FlowRuleEntity entity) {
-        AuthUser authUser = authService.getAuthUser(request);
-        authUser.authTarget(entity.getApp(), PrivilegeType.WRITE_RULE);
-
+    @AuthAction(PrivilegeType.WRITE_RULE)
+    public Result<FlowRuleEntity> apiAddFlowRule(@RequestBody FlowRuleEntity entity) {
         Result<FlowRuleEntity> checkResult = checkEntityInternal(entity);
         if (checkResult != null) {
             return checkResult;
@@ -162,25 +139,23 @@ public class FlowControllerV1 {
         entity.setResource(entity.getResource().trim());
         try {
             entity = repository.save(entity);
-        } catch (Throwable throwable) {
-            logger.error("Failed to add flow rule", throwable);
-            return Result.ofThrowable(-1, throwable);
+
+            publishRules(entity.getApp(), entity.getIp(), entity.getPort()).get(5000, TimeUnit.MILLISECONDS);
+            return Result.ofSuccess(entity);
+        } catch (Throwable t) {
+            Throwable e = t instanceof ExecutionException ? t.getCause() : t;
+            logger.error("Failed to add new flow rule, app={}, ip={}", entity.getApp(), entity.getIp(), e);
+            return Result.ofFail(-1, e.getMessage());
         }
-        if (!publishRules(entity.getApp(), entity.getIp(), entity.getPort())) {
-            logger.error("Publish flow rules failed after rule add");
-        }
-        return Result.ofSuccess(entity);
     }
 
     @PutMapping("/save.json")
-    public Result<FlowRuleEntity> updateIfNotNull(HttpServletRequest request, Long id, String app,
+    @AuthAction(PrivilegeType.WRITE_RULE)
+    public Result<FlowRuleEntity> apiUpdateFlowRule(Long id, String app,
                                                   String limitApp, String resource, Integer grade,
                                                   Double count, Integer strategy, String refResource,
                                                   Integer controlBehavior, Integer warmUpPeriodSec,
                                                   Integer maxQueueingTimeMs) {
-        AuthUser authUser = authService.getAuthUser(request);
-        authUser.authTarget(app, PrivilegeType.WRITE_RULE);
-
         if (id == null) {
             return Result.ofFail(-1, "id can't be null");
         }
@@ -241,21 +216,23 @@ public class FlowControllerV1 {
         try {
             entity = repository.save(entity);
             if (entity == null) {
-                return Result.ofFail(-1, "save entity fail");
+                return Result.ofFail(-1, "save entity fail: null");
             }
-        } catch (Throwable throwable) {
-            logger.error("save error:", throwable);
-            return Result.ofThrowable(-1, throwable);
+
+            publishRules(entity.getApp(), entity.getIp(), entity.getPort()).get(5000, TimeUnit.MILLISECONDS);
+            return Result.ofSuccess(entity);
+        } catch (Throwable t) {
+            Throwable e = t instanceof ExecutionException ? t.getCause() : t;
+            logger.error("Error when updating flow rules, app={}, ip={}, ruleId={}", entity.getApp(),
+                entity.getIp(), id, e);
+            return Result.ofFail(-1, e.getMessage());
         }
-        if (!publishRules(entity.getApp(), entity.getIp(), entity.getPort())) {
-            logger.info("publish flow rules fail after rule update");
-        }
-        return Result.ofSuccess(entity);
     }
 
     @DeleteMapping("/delete.json")
-    public Result<Long> delete(HttpServletRequest request, Long id) {
-        AuthUser authUser = authService.getAuthUser(request);
+    @AuthAction(PrivilegeType.WRITE_RULE)
+    public Result<Long> apiDeleteFlowRule(Long id) {
+
         if (id == null) {
             return Result.ofFail(-1, "id can't be null");
         }
@@ -263,27 +240,25 @@ public class FlowControllerV1 {
         if (oldEntity == null) {
             return Result.ofSuccess(null);
         }
-        authUser.authTarget(oldEntity.getApp(), PrivilegeType.DELETE_RULE);
+
         try {
             repository.delete(id);
         } catch (Exception e) {
             return Result.ofFail(-1, e.getMessage());
         }
-        if (!publishRules(oldEntity.getApp(), oldEntity.getIp(), oldEntity.getPort())) {
-            logger.info("publish flow rules fail after rule delete");
+        try {
+            publishRules(oldEntity.getApp(), oldEntity.getIp(), oldEntity.getPort()).get(5000, TimeUnit.MILLISECONDS);
+            return Result.ofSuccess(id);
+        } catch (Throwable t) {
+            Throwable e = t instanceof ExecutionException ? t.getCause() : t;
+            logger.error("Error when deleting flow rules, app={}, ip={}, id={}", oldEntity.getApp(),
+                oldEntity.getIp(), id, e);
+            return Result.ofFail(-1, e.getMessage());
         }
-        return Result.ofSuccess(id);
     }
 
-    private boolean publishRules(String app, String ip, Integer port) {
+    private CompletableFuture<Void> publishRules(String app, String ip, Integer port) {
         List<FlowRuleEntity> rules = repository.findAllByMachine(MachineInfo.of(app, ip, port));
-        if (nacosConfig.isEnable()) {
-            try {
-                flowRuleNacosPublisher.publish(app, rules);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-        return sentinelApiClient.setFlowRuleOfMachine(app, ip, port, rules);
+        return sentinelApiClient.setFlowRuleOfMachineAsync(app, ip, port, rules);
     }
 }
