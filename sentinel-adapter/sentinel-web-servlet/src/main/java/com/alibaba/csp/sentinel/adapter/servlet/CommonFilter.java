@@ -86,13 +86,15 @@ public class CommonFilter implements Filter {
             // Clean and unify the URL.
             // For REST APIs, you have to clean the URL (e.g. `/foo/1` and `/foo/2` -> `/foo/:id`), or
             // the amount of context and resources will exceed the threshold.
-            UrlCleaner urlCleaner = WebCallbackManager.getUrlCleaner();
-            if (urlCleaner != null) {
-                target = urlCleaner.clean(target);
-            }
+            //取消restful风格接口的url格式化
+//            UrlCleaner urlCleaner = WebCallbackManager.getUrlCleaner();
+//            if (urlCleaner != null) {
+//                target = urlCleaner.clean(target);
+//            }
 
             // If you intend to exclude some URLs, you can convert the URLs to the empty string ""
             // in the UrlCleaner implementation.
+            System.out.println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
             if (!StringUtil.isEmpty(target)) {
                 // Parse the request origin using registered origin parser.
                 String origin = parseOrigin(sRequest);

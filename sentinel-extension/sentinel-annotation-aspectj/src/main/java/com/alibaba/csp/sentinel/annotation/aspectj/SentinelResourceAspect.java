@@ -20,6 +20,7 @@ import com.alibaba.csp.sentinel.EntryType;
 import com.alibaba.csp.sentinel.SphU;
 import com.alibaba.csp.sentinel.annotation.SentinelResource;
 import com.alibaba.csp.sentinel.slots.block.BlockException;
+import com.alibaba.csp.sentinel.util.MethodUtil;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
@@ -49,11 +50,14 @@ public class SentinelResourceAspect extends AbstractSentinelAspectSupport {
             throw new IllegalStateException("Wrong state for SentinelResource annotation");
         }
         String resourceName = getResourceName(annotation.value(), originMethod);
+        String urlResourceName=MethodUtil.resolveMethodName(originMethod);
+
         EntryType entryType = annotation.entryType();
         int resourceType = annotation.resourceType();
         Entry entry = null;
         try {
-            entry = SphU.entry(resourceName, resourceType, entryType, pjp.getArgs());
+//            entry = SphU.entry(resourceName, resourceType, entryType, pjp.getArgs());
+            entry = SphU.entry(resourceName, urlResourceName,resourceType, entryType, pjp.getArgs());
             Object result = pjp.proceed();
             return result;
         } catch (BlockException ex) {

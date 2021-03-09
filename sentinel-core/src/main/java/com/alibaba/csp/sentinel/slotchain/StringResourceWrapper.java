@@ -27,11 +27,13 @@ import com.alibaba.csp.sentinel.ResourceTypeConstants;
 public class StringResourceWrapper extends ResourceWrapper {
 
     public StringResourceWrapper(String name, EntryType e) {
-        super(name, e, ResourceTypeConstants.COMMON);
+        super(name, null,e, ResourceTypeConstants.COMMON);
     }
-
     public StringResourceWrapper(String name, EntryType e, int resType) {
-        super(name, e, resType);
+        super(name, null,e, resType);
+    }
+    public StringResourceWrapper(String name,String urlResourceName, EntryType e, int resType) {
+        super(name, urlResourceName,e, resType);
     }
 
     @Override

@@ -38,6 +38,19 @@ public interface SphResourceTypeSupport {
         throws BlockException;
 
     /**
+     * 增加url
+     * @param name
+     * @param urlResourceName
+     * @param resourceType
+     * @param entryType
+     * @param count
+     * @param args
+     * @return
+     * @throws BlockException
+     */
+    Entry entryWithType(String name, String urlResourceName,int resourceType, EntryType entryType, int count, Object[] args)
+            throws BlockException;
+    /**
      * Create a protected resource with provided classification.
      *
      * @param name the unique name of the protected resource
@@ -52,6 +65,20 @@ public interface SphResourceTypeSupport {
     Entry entryWithType(String name, int resourceType, EntryType entryType, int count, boolean prioritized,
                         Object[] args) throws BlockException;
 
+    /**
+     * 增加一个资源名
+     * @param name
+     * @param urlResourceName
+     * @param resourceType
+     * @param entryType
+     * @param count
+     * @param prioritized
+     * @param args
+     * @return
+     * @throws BlockException
+     */
+    Entry entryWithType(String name,String urlResourceName, int resourceType, EntryType entryType, int count, boolean prioritized,
+                        Object[] args) throws BlockException;
     /**
      * Create an asynchronous resource with provided classification.
      *

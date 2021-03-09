@@ -24,6 +24,7 @@ import com.alibaba.csp.sentinel.node.DefaultNode;
 import com.alibaba.csp.sentinel.slots.block.BlockException;
 import com.alibaba.csp.sentinel.metric.extension.MetricExtension;
 import com.alibaba.csp.sentinel.util.AssertUtil;
+import com.alibaba.csp.sentinel.util.StringUtil;
 
 /**
  * This class is used to record other exceptions except block exception.
@@ -72,9 +73,12 @@ public class Tracer {
         if (context == null || context instanceof NullContext) {
             return;
         }
-
+        //1、entry需要有url作为名称
+        //2、curNode需要有url作为资源名
         DefaultNode curNode = (DefaultNode)context.getCurNode();
-        traceExceptionToNode(e, count, context.getCurEntry(), curNode);
+        DefaultNode urlNode =(DefaultNode)context.getUrlNode();
+//        context.getCurEntry().getResourceWrapper().get
+        traceExceptionToNode(e, count, context.getCurEntry(), curNode,urlNode);
     }
 
     /**
@@ -102,6 +106,7 @@ public class Tracer {
             return;
         }
 
+
         DefaultNode curNode = (DefaultNode)entry.getCurNode();
         traceExceptionToNode(e, count, entry, curNode);
     }
@@ -122,6 +127,36 @@ public class Tracer {
         clusterNode.trace(t, count);
     }
 
+
+    private static void traceExceptionToNode(Throwable t, int count, Entry entry, DefaultNode curNode,DefaultNode urlNode) {
+        if (curNode == null) {
+            return;
+        }
+
+        for (MetricExtension m : MetricExtensionProvider.getMetricExtensions()) {
+            m.addException(entry.getResourceWrapper().getName(), count, t);
+            if(StringUtil.isNotEmpty(entry.getResourceWrapper().getUrl())){
+                m.addException(entry.getResourceWrapper().getUrl(), count, t);
+            }
+        }
+
+        // clusterNode can be null when Constants.ON is false.
+        ClusterNode clusterNode = curNode.getClusterNode();
+        if (clusterNode == null) {
+            return;
+        }
+        clusterNode.trace(t, count);
+
+        if (urlNode == null) {
+            return;
+        }
+        // urlNode can be null when Constants.ON is false.
+        ClusterNode urlCNode = urlNode.getClusterNode();
+        if (urlCNode == null) {
+            return;
+        }
+        urlCNode.trace(t, count);
+    }
     /**
      * Set exception to trace. If not set, all Exception except for {@link BlockException} will be traced.
      * <p>

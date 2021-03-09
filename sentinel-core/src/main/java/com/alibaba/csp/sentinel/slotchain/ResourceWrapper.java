@@ -28,17 +28,25 @@ import com.alibaba.csp.sentinel.util.AssertUtil;
 public abstract class ResourceWrapper {
 
     protected final String name;
-
+    protected final String url;
     protected final EntryType entryType;
     protected final int resourceType;
 
-    public ResourceWrapper(String name, EntryType entryType, int resourceType) {
+    public ResourceWrapper(String name, String url,EntryType entryType, int resourceType) {
+        AssertUtil.notEmpty(name, "resource name cannot be empty");
+        AssertUtil.notNull(entryType, "entryType cannot be null");
+        this.name = name;
+        this.url = url;
+        this.entryType = entryType;
+        this.resourceType = resourceType;
+    }
+   /* public ResourceWrapper(String name, EntryType entryType, int resourceType) {
         AssertUtil.notEmpty(name, "resource name cannot be empty");
         AssertUtil.notNull(entryType, "entryType cannot be null");
         this.name = name;
         this.entryType = entryType;
         this.resourceType = resourceType;
-    }
+    }*/
 
     /**
      * Get the resource name.
@@ -49,6 +57,9 @@ public abstract class ResourceWrapper {
         return name;
     }
 
+    public String getUrl() {
+        return url;
+    }
     /**
      * Get {@link EntryType} of this wrapper.
      *

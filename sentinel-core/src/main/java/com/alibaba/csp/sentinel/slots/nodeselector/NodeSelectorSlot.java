@@ -22,7 +22,9 @@ import com.alibaba.csp.sentinel.node.DefaultNode;
 import com.alibaba.csp.sentinel.node.EntranceNode;
 import com.alibaba.csp.sentinel.slotchain.AbstractLinkedProcessorSlot;
 import com.alibaba.csp.sentinel.slotchain.ResourceWrapper;
+import com.alibaba.csp.sentinel.slotchain.StringResourceWrapper;
 import com.alibaba.csp.sentinel.spi.SpiOrder;
+import com.alibaba.csp.sentinel.util.StringUtil;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -156,6 +158,7 @@ public class NodeSelectorSlot extends AbstractLinkedProcessorSlot<Object> {
         if (node == null) {
             synchronized (this) {
                 node = map.get(context.getName());
+                System.out.println(context.getName()+"是上面拿到的contextName》》》》》》》》》》》》》》》");
                 if (node == null) {
                     node = new DefaultNode(resourceWrapper, null);
                     HashMap<String, DefaultNode> cacheMap = new HashMap<String, DefaultNode>(map.size());
@@ -164,13 +167,40 @@ public class NodeSelectorSlot extends AbstractLinkedProcessorSlot<Object> {
                     map = cacheMap;
                     // Build invocation tree
                     ((DefaultNode) context.getLastNode()).addChild(node);
+
                 }
 
             }
         }
 
         context.setCurNode(node);
-        fireEntry(context, resourceWrapper, node, count, prioritized, args);
+        if(StringUtil.isNotEmpty(resourceWrapper.getUrl())){
+            System.out.println(resourceWrapper.getUrl()+"是拿到的url》》》》》》》》》》》》》》》");
+            DefaultNode node2 = map.get(context.getUrl());
+            System.out.println(context.getName()+"是下面拿到的contextName》》》》》》》》》》》》》》》");
+            System.out.println(context.getUrl()+"是下面拿到的getUrl》》》》》》》》》》》》》》》");
+            if (node2 == null) {
+                synchronized (this) {
+                    node2 = map.get(context.getUrl());
+                    if (node2 == null) {
+                        ResourceWrapper rw=new StringResourceWrapper(resourceWrapper.getUrl(),resourceWrapper.getEntryType(),resourceWrapper.getResourceType());
+                        node2 = new DefaultNode(rw, null);
+                        HashMap<String, DefaultNode> cacheMap = new HashMap<String, DefaultNode>(map.size());
+                        cacheMap.putAll(map);
+                        cacheMap.put(context.getUrl(), node2);
+                        map = cacheMap;
+                        // Build invocation tree
+                        ((DefaultNode) context.getLastNode()).addChild(node2);
+                    }
+
+                }
+            }
+
+            fireEntry(context, resourceWrapper, node, count, prioritized, args);
+        }else{
+            fireEntry(context, resourceWrapper, node, count, prioritized, args);
+        }
+
     }
 
     @Override

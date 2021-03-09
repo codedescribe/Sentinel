@@ -54,6 +54,7 @@ public abstract class Entry implements AutoCloseable {
 
     private long createTime;
     private Node curNode;
+    private Node urlNode;
     /**
      * {@link Node} of the specific origin, Usually the origin is the Service Consumer.
      */
@@ -61,13 +62,23 @@ public abstract class Entry implements AutoCloseable {
     private Throwable error;
     protected ResourceWrapper resourceWrapper;
 
+    protected ResourceWrapper urlResourceWrapper;
+
     public Entry(ResourceWrapper resourceWrapper) {
         this.resourceWrapper = resourceWrapper;
+        this.createTime = TimeUtil.currentTimeMillis();
+    }
+    public Entry(ResourceWrapper resourceWrapper,ResourceWrapper urlResourceWrapper) {
+        this.resourceWrapper = resourceWrapper;
+        this.urlResourceWrapper=urlResourceWrapper;
         this.createTime = TimeUtil.currentTimeMillis();
     }
 
     public ResourceWrapper getResourceWrapper() {
         return resourceWrapper;
+    }
+    public ResourceWrapper getUrlResourceWrapper() {
+        return urlResourceWrapper;
     }
 
     /**
@@ -130,7 +141,13 @@ public abstract class Entry implements AutoCloseable {
     public void setCurNode(Node node) {
         this.curNode = node;
     }
+    public Node getUrlNode() {
+        return urlNode;
+    }
 
+    public void setUrlNode(Node urlNode) {
+        this.urlNode = urlNode;
+    }
     public Throwable getError() {
         return error;
     }

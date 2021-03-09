@@ -36,7 +36,7 @@ public class MethodResourceWrapper extends ResourceWrapper {
     }
 
     public MethodResourceWrapper(Method method, EntryType e, int resType) {
-        super(MethodUtil.resolveMethodName(method), e, resType);
+        super(MethodUtil.resolveMethodName(method),null, e, resType);
         this.method = method;
     }
 

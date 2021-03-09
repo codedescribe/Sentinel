@@ -303,6 +303,20 @@ public class SphU {
     }
 
     /**
+     * 新增内容，添加url的资源名
+     * @param name
+     * @param resourceType
+     * @param type
+     * @param args
+     * @return
+     * @throws BlockException
+     */
+    public static Entry entry(String name,String urlResourceName, int resourceType, EntryType type, Object[] args)
+            throws BlockException {
+        return Env.sph.entryWithType(name, urlResourceName,resourceType, type, 1, args);
+    }
+
+    /**
      * Record statistics and check all rules of the resource.
      *
      * @param name         the unique name for the protected resource

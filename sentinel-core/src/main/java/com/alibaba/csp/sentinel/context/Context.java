@@ -61,6 +61,7 @@ public class Context {
      */
     private final String name;
 
+    private final String url;
     /**
      * The entrance node of current invocation tree.
      */
@@ -98,6 +99,7 @@ public class Context {
         this.name = name;
         this.entranceNode = entranceNode;
         this.async = async;
+        this.url="";
     }
 
     public boolean isAsync() {
@@ -107,7 +109,9 @@ public class Context {
     public String getName() {
         return name;
     }
-
+    public String getUrl() {
+        return url;
+    }
     public Node getCurNode() {
         return curEntry == null ? null : curEntry.getCurNode();
     }
@@ -116,7 +120,13 @@ public class Context {
         this.curEntry.setCurNode(node);
         return this;
     }
-
+    public Context setUrlNode(Node node) {
+        this.curEntry.setUrlNode(node);
+        return this;
+    }
+    public Node getUrlNode() {
+        return curEntry == null ? null : curEntry.getUrlNode();
+    }
     public Entry getCurEntry() {
         return curEntry;
     }

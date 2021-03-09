@@ -43,6 +43,13 @@ class CtEntry extends Entry {
 
         setUpEntryFor(context);
     }
+//添加
+    CtEntry(ResourceWrapper resourceWrapper, ResourceWrapper urlResourceWrapper,ProcessorSlot<Object> chain, Context context) {
+        super(resourceWrapper,urlResourceWrapper);
+        this.chain = chain;
+        this.context = context;
+        setUpEntryFor(context);
+    }
 
     private void setUpEntryFor(Context context) {
         // The entry should not be associated to NullContext.

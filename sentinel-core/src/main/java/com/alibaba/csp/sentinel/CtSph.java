@@ -120,7 +120,8 @@ public class CtSph implements Sph {
         if (context instanceof NullContext) {
             // The {@link NullContext} indicates that the amount of context has exceeded the threshold,
             // so here init the entry only. No rule checking will be done.
-            return new CtEntry(resourceWrapper, null, context);
+            ResourceWrapper urlRw=new StringResourceWrapper(resourceWrapper.getName(), resourceWrapper.getUrl(),resourceWrapper.getEntryType(), resourceWrapper.getResourceType());
+            return new CtEntry(resourceWrapper,urlRw, null, context);
         }
 
         if (context == null) {
@@ -341,12 +342,22 @@ public class CtSph implements Sph {
     }
 
     @Override
+    public Entry entryWithType(String name, String urlResourceName,int resourceType, EntryType entryType, int count, Object[] args)
+            throws BlockException {
+        return entryWithType(name,urlResourceName, resourceType, entryType, count, false, args);
+    }
+    @Override
     public Entry entryWithType(String name, int resourceType, EntryType entryType, int count, boolean prioritized,
                                Object[] args) throws BlockException {
         StringResourceWrapper resource = new StringResourceWrapper(name, entryType, resourceType);
         return entryWithPriority(resource, count, prioritized, args);
     }
-
+    @Override
+    public Entry entryWithType(String name, String urlResourceName,int resourceType, EntryType entryType, int count, boolean prioritized,
+                               Object[] args) throws BlockException {
+        StringResourceWrapper resource = new StringResourceWrapper(name,urlResourceName,entryType, resourceType);
+        return entryWithPriority(resource, count, prioritized, args);
+    }
     @Override
     public AsyncEntry asyncEntryWithType(String name, int resourceType, EntryType entryType, int count,
                                          boolean prioritized, Object[] args) throws BlockException {
